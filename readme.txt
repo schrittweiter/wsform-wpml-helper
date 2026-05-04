@@ -20,10 +20,12 @@ This helper plugin avoids the duplication. It walks the form object on save and 
 
 Auto-discovered from each form, no per-form configuration required:
 
+* Group (tab) and section labels
 * Field labels, placeholders, help text, descriptions
 * Validation messages (`invalid_feedback`, `required_invalid_feedback`)
 * Button labels (submit, reset, next, previous, clear, save, custom)
-* HTML block content
+* HTML field content and Text Editor (content) field content
+* Select-field placeholder (`placeholder_row`), Select2 user-visible messages
 * Select / radio / checkbox option labels
 * Action strings: Show Message banners, Send Email subject + body + from-name, Save Submission user-response email
 
