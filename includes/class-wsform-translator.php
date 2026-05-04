@@ -46,6 +46,9 @@ class WSForm_Translator {
 	 */
 	private const META_PROPS = array(
 		'placeholder',
+		// Select fields use a separate "row placeholder" rather than
+		// the generic `placeholder` — covers both.
+		'placeholder_row',
 		'help',
 		'invalid_feedback',
 		'required_invalid_feedback',
@@ -56,10 +59,22 @@ class WSForm_Translator {
 		'clear_label',
 		'save_label',
 		'button_label',
+		// `html_editor` = HTML field, `text_editor` = Text Editor /
+		// content field. Both are static content blocks.
 		'html_editor',
+		'text_editor',
 		'html',
 		'message',
 		'description',
+		// Select2 user-visible messages. Skipped silently when the
+		// editor leaves them blank (Select2 falls back to its own
+		// per-language defaults).
+		'select2_no_match',
+		'select2_language_searching',
+		'select2_language_no_results',
+		'select2_language_error_loading',
+		'select2_language_input_too_short',
+		'select2_language_input_too_long',
 	);
 
 	/**
@@ -247,10 +262,25 @@ class WSForm_Translator {
 			return $form_object;
 		}
 
-		$this->walk_fields(
+		$this->walk_containers(
 			$form_object,
-			function ( $field ) use ( $form_id ) {
-				$this->translate_field( $field, $form_id );
+			function ( string $kind, int $container_id, object $container ) use ( $form_id ) {
+				if ( 'field' === $kind ) {
+					$this->translate_field( $container, $form_id );
+					return;
+				}
+				// `group` and `section` — translate the container's label.
+				if ( ! isset( $container->label ) ) {
+					return;
+				}
+				$original = (string) $container->label;
+				if ( '' === $original ) {
+					return;
+				}
+				$container->label = $this->translate(
+					$this->container_string_name( $form_id, $kind, $container_id ),
+					$original
+				);
 			}
 		);
 
@@ -393,10 +423,24 @@ class WSForm_Translator {
 			return;
 		}
 
-		$this->walk_fields(
+		$this->walk_containers(
 			$form_object,
-			function ( $field ) use ( $form_id ) {
-				$this->register_field_strings( $field, $form_id );
+			function ( string $kind, int $container_id, object $container ) use ( $form_id ) {
+				if ( 'field' === $kind ) {
+					$this->register_field_strings( $container, $form_id );
+					return;
+				}
+				if ( ! isset( $container->label ) ) {
+					return;
+				}
+				$value = (string) $container->label;
+				if ( '' === $value ) {
+					return;
+				}
+				$this->register_string(
+					$this->container_string_name( $form_id, $kind, $container_id ),
+					$value
+				);
 			}
 		);
 
@@ -692,21 +736,43 @@ class WSForm_Translator {
 	 * --------------------------------------------------------------- */
 
 	/**
-	 * Iterate every field in a parsed form object, calling `$cb` on
-	 * each. Tolerant of malformed structures.
+	 * Iterate every translatable container (group, section, field) in
+	 * a parsed form object, calling `$cb($kind, $id, $container)`.
+	 *
+	 * `$kind` is one of `'group'`, `'section'`, `'field'`. `$id` is the
+	 * container's database ID — stable across renames, so it survives
+	 * label edits without invalidating WPML keys.
+	 *
+	 * Tolerant of malformed structures.
 	 *
 	 * @param object   $form_object WS Form form object.
-	 * @param callable $cb          Callable receiving each field.
+	 * @param callable $cb          Receiver — `function(string $kind, int $id, object $container): void`.
 	 */
-	private function walk_fields( object $form_object, callable $cb ): void {
+	private function walk_containers( object $form_object, callable $cb ): void {
 		if ( empty( $form_object->groups ) || ! is_array( $form_object->groups ) ) {
 			return;
 		}
 		foreach ( $form_object->groups as $group ) {
+			if ( ! is_object( $group ) ) {
+				continue;
+			}
+			$group_id = isset( $group->id ) ? (int) $group->id : 0;
+			if ( $group_id > 0 ) {
+				$cb( 'group', $group_id, $group );
+			}
+
 			if ( empty( $group->sections ) || ! is_array( $group->sections ) ) {
 				continue;
 			}
 			foreach ( $group->sections as $section ) {
+				if ( ! is_object( $section ) ) {
+					continue;
+				}
+				$section_id = isset( $section->id ) ? (int) $section->id : 0;
+				if ( $section_id > 0 ) {
+					$cb( 'section', $section_id, $section );
+				}
+
 				if ( empty( $section->fields ) || ! is_array( $section->fields ) ) {
 					continue;
 				}
@@ -714,7 +780,11 @@ class WSForm_Translator {
 					if ( ! is_object( $field ) ) {
 						continue;
 					}
-					$cb( $field );
+					$field_id = isset( $field->id ) ? (int) $field->id : 0;
+					if ( $field_id <= 0 ) {
+						continue;
+					}
+					$cb( 'field', $field_id, $field );
 				}
 			}
 		}
@@ -747,6 +817,17 @@ class WSForm_Translator {
 	 */
 	private function string_name( int $form_id, int $field_id, string $prop ): string {
 		return sprintf( 'form_%d_field_%d_%s', $form_id, $field_id, $prop );
+	}
+
+	/**
+	 * Build the WPML string name for a group/section label.
+	 *
+	 * Format: `form_{form_id}_{kind}_{id}_label` where kind is
+	 * `group` or `section`. Keyed by the container's DB id so renames
+	 * (label edits) don't invalidate the key.
+	 */
+	private function container_string_name( int $form_id, string $kind, int $container_id ): string {
+		return sprintf( 'form_%d_%s_%d_label', $form_id, $kind, $container_id );
 	}
 
 	/**

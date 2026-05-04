@@ -30,10 +30,13 @@ Auto-discovered from each form, no per-form configuration required:
 
 | Surface | Properties |
 |---|---|
+| Group / section labels | `$group->label`, `$section->label` (tab and section titles) |
 | Field copy | `label`, `placeholder`, `help`, `description` |
+| Select placeholder | `placeholder_row` (select fields use this instead of `placeholder`) |
 | Validation | `invalid_feedback`, `required_invalid_feedback` |
 | Buttons | `submit_label`, `reset_label`, `next_label`, `previous_label`, `clear_label`, `save_label`, `button_label` |
-| Content blocks | `html`, `html_editor`, `message` |
+| Content blocks | `html`, `html_editor`, `text_editor`, `message` |
+| Select2 messages | `select2_no_match`, `select2_language_searching`, `select2_language_no_results`, `select2_language_error_loading`, `select2_language_input_too_short`, `select2_language_input_too_long` |
 | Choice options | `data_grid_select`, `data_grid_radio`, `data_grid_checkbox` (each row's first column) |
 | Show Message action | `action_message_message` |
 | Send Email action | `action_email_subject`, `action_email_email_body`, `action_email_email_body_plain`, `action_email_from_name` |
